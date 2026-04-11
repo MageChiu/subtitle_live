@@ -1,119 +1,101 @@
-# SubtitleLive - AI 实时字幕软件
+# SubtitleLive — AI 实时字幕软件
 
-## 功能特性
+## 功能
 
-- **实时语音识别**: 捕获电脑播放的音频，实时转为文字
-- **多语言支持**: 英语、日语、法语等（可扩展）
-- **智能翻译**: 自动翻译为中文（可扩展其他目标语言）
-- **双语字幕**: 同时显示原文和翻译字幕
-- **悬浮显示**: 无边框置顶窗口，不遮挡视频观看
-- **后台运行**: 系统托盘常驻，随时开关
-- **插件架构**: ASR 和翻译引擎均可扩展
+- **实时语音识别** — 捕获电脑播放音频, 英语/日语/法语等 15 种语言
+- **智能翻译** — Google Free (零配置) 或 OpenAI (高质量) 双后端
+- **双语字幕** — 原文 + 翻译同时悬浮显示
+- **悬浮窗** — 无边框置顶、半透明圆角、可拖动/缩放、右键菜单
+- **后台运行** — 系统托盘常驻, 随时控制
+- **插件架构** — ASR / 翻译引擎自动发现, 扩展零侵入
 
-## 安装
+## 项目结构
+
+```
+subtitle_live/
+├── main.py                          # 入口
+├── requirements.txt
+│
+├── core/                            # 核心层 (与 UI 无关)
+│   ├── __init__.py
+│   ├── models.py                    #   数据模型
+│   ├── interfaces.py                #   ASR / 翻译抽象接口
+│   ├── plugin_registry.py           #   插件自动发现 & 注册
+│   ├── config.py                    #   分层配置
+│   ├── audio_capture.py             #   系统音频捕获
+│   └── pipeline.py                  #   字幕管线 (Audio→ASR→翻译)
+│
+├── plugins/                         # 插件目录 (按类型分包)
+│   ├── asr/
+│   │   ├── whisper_asr.py           #     Faster-Whisper 引擎
+│   │   └── _template.py             #     扩展模板
+│   └── translator/
+│       ├── google_free.py           #     Google 免费翻译
+│       ├── openai_translator.py     #     OpenAI 翻译
+│       └── _template.py             #     扩展模板
+│
+└── ui/                              # 展示层 (PyQt6)
+    ├── __init__.py
+    ├── overlay.py                   #   悬浮字幕窗口
+    └── tray.py                      #   系统托盘应用
+```
+
+## 快速开始
 
 ```bash
-# 1. 克隆项目
-git clone <repo-url>
-cd subtitle_live
-
-# 2. 创建虚拟环境
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate   # Windows
-
-# 3. 安装依赖
 pip install -r requirements.txt
-```
-
-### 音频捕获配置
-
-#### Windows
-- 通常自带 "Stereo Mix" 或 "WASAPI Loopback"
-- 在声音设置中启用 "立体声混音"
-
-#### macOS
-- 安装 [BlackHole](https://github.com/ExistentialAudio/BlackHole)
-- 在"音频 MIDI 设置"中创建多输出设备
-
-#### Linux
-- PulseAudio 自带 Monitor 设备
-- `pactl load-module module-loopback`
-
-## 使用
-
-```bash
 python main.py
+
+# 或指定参数
+python main.py -s en -t zh -m small --device cuda
 ```
 
-启动后在系统托盘找到 **S** 图标:
-1. 右键 → **开始识别**
-2. 播放视频，字幕自动显示
-3. 右键字幕窗口可控制显示/隐藏原文和翻译
+## 扩展新引擎
 
-## 快捷操作
-
-| 操作 | 说明 |
-|---|---|
-| 拖动字幕窗口 | 左键拖动调整位置 |
-| 右键字幕窗口 | 显示/隐藏原文或翻译 |
-| 托盘右键菜单 | 切换语言、模型、启停 |
-
-## 扩展开发
-
-### 添加新的 ASR 引擎
+### 添加 ASR 引擎
 
 ```python
-from plugin_registry import ASRPlugin, ASRResult, PluginRegistry
+# plugins/asr/my_engine.py
+from core.interfaces import ASRPlugin
+from core.models import ASRResult
+from core.plugin_registry import PluginRegistry
 
 @PluginRegistry.register_asr
 class MyASR(ASRPlugin):
-    def name(self) -> str:
-        return "my_asr"
-    
-    def supported_languages(self):
-        return ["en", "zh"]
-    
-    def load_model(self, model_size, device):
-        # 加载你的模型
-        pass
-    
-    def transcribe(self, audio_data, sample_rate, language=None):
-        # 识别逻辑
-        return ASRResult(text="...", language="en", confidence=0.9)
+    def name(self): return "my_asr"
+    def supported_languages(self): return ["en", "zh"]
+    def load_model(self, **kw): ...
+    def transcribe(self, audio, **kw): return ASRResult(...)
 ```
 
-### 添加新的翻译引擎
+### 添加翻译引擎
 
 ```python
-from plugin_registry import TranslatorPlugin, TranslationResult, PluginRegistry
+# plugins/translator/my_trans.py
+from core.interfaces import TranslatorPlugin
+from core.models import TranslationResult
+from core.plugin_registry import PluginRegistry
 
 @PluginRegistry.register_translator
-class MyTranslator(TranslatorPlugin):
-    def name(self) -> str:
-        return "my_translator"
-    
-    def supported_targets(self):
-        return ["zh", "en"]
-    
-    def translate(self, text, source_lang, target_lang):
-        # 翻译逻辑
-        return TranslationResult(
-            original=text, translated="...",
-            source_lang=source_lang, target_lang=target_lang
-        )
+class MyTrans(TranslatorPlugin):
+    def name(self): return "my_trans"
+    def supported_targets(self): return ["zh", "en"]
+    def translate(self, text, src, tgt): return TranslationResult(...)
 ```
 
-## 技术架构
+放入对应目录后重启即生效, 无需修改任何现有代码。
+
+## 架构
 
 ```
-Audio Capture → ASR Engine → Translator → Overlay UI
-  (Loopback)    (Whisper)   (Pluggable)   (PyQt6)
+Audio Capture ──▶ Queue ──▶ ASR Worker ──▶ Queue ──▶ Translate Worker
+  (Loopback)        │        (Whisper)        │        (Google/OpenAI)
+                    │                          │               │
+                    └──── 3 线程异步 ──────────┘          SubtitleEvent
+                                                               │
+                                                        Overlay UI (PyQt6)
+                                                       ┌──────────────────┐
+                                                       │ Hello, world!    │
+                                                       │ 你好，世界！      │
+                                                       └──────────────────┘
 ```
-
-## 依赖
-
-- Python 3.10+
-- PyQt6 (GUI)
-- faster-whisper (语音识别)
-- sounddevice (音频捕获)
