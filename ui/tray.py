@@ -27,6 +27,7 @@ from PyQt6.QtCore import Qt, QSize, QTimer
 from core.config import AppConfig
 from core.models import SubtitleEvent
 from core.pipeline import SubtitlePipeline
+from ui.control_panel import ControlPanel
 from ui.overlay import SubtitleOverlay
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,7 @@ class TrayApplication:
         self._app: Optional[QApplication] = None
         self._tray: Optional[QSystemTrayIcon] = None
         self._menu_host: Optional[QMainWindow] = None
+        self._panel: Optional[ControlPanel] = None
         self._overlay: Optional[SubtitleOverlay] = None
         self._pipeline: Optional[SubtitlePipeline] = None
         self._is_running = False
@@ -88,6 +90,7 @@ class TrayApplication:
 
         self._build_tray()
         self._build_menu_bar()
+        self._build_control_panel()
 
         self._tray.showMessage(
             "SubtitleLive",
@@ -96,6 +99,9 @@ class TrayApplication:
         )
         if self._cfg.auto_start:
             QTimer.singleShot(0, self._start)
+        if platform.system() == "Darwin":
+            # macOS: 托盘经常不可见/不可发现，默认弹出控制面板
+            QTimer.singleShot(0, self._panel.show)
         return self._app.exec()
 
     # ---- 托盘 ----
@@ -178,6 +184,7 @@ class TrayApplication:
 
         # 复用同一组 QAction，避免状态分叉
         main.addAction(self._act_toggle)
+        main.addAction("控制面板", self._show_control_panel)
         main.addSeparator()
 
         self._src_acts_mb = self._add_radio_submenu(
@@ -197,6 +204,34 @@ class TrayApplication:
         main.addAction(self._act_overlay)
         main.addSeparator()
         main.addAction("退出", self._quit)
+
+    def _build_control_panel(self) -> None:
+        self._panel = ControlPanel(
+            source_options=SOURCE_LANGUAGES,
+            target_options=TARGET_LANGUAGES,
+            model_options=MODEL_SIZES,
+            current_source=self._cfg.asr.source_language,
+            current_target=self._cfg.translator.target_language,
+            current_model=self._cfg.asr.model_size,
+            overlay_visible=True,
+        )
+        self._panel.setWindowIcon(self._make_icon())
+        self._panel.set_handlers(
+            on_toggle=self._toggle,
+            on_source=self._set_src,
+            on_target=self._set_tgt,
+            on_model=self._set_model,
+            on_overlay=self._toggle_overlay,
+            on_quit=self._quit,
+        )
+        self._panel.set_running(self._is_running)
+
+    def _show_control_panel(self) -> None:
+        if not self._panel:
+            return
+        self._panel.show()
+        self._panel.raise_()
+        self._panel.activateWindow()
 
     def _add_radio_submenu(self, parent_menu, title, options, current, setter):
         """创建单选子菜单, 返回 {code: QAction}"""
@@ -258,6 +293,8 @@ class TrayApplication:
             self._act_toggle.setText("⏹ 停止识别")
             self._act_toggle.setEnabled(True)
             self._overlay.show()
+            if self._panel:
+                self._panel.set_running(True)
 
             self._tray.showMessage(
                 "SubtitleLive", "识别已开始",
@@ -274,6 +311,8 @@ class TrayApplication:
         self._is_running = False
         self._act_toggle.setText("▶ 开始识别")
         self._overlay.clear_subtitle()
+        if self._panel:
+            self._panel.set_running(False)
 
     def _set_src(self, lang: str):
         for c, a in self._src_acts.items():
@@ -281,6 +320,8 @@ class TrayApplication:
         for c, a in getattr(self, "_src_acts_mb", {}).items():
             a.setChecked(c == lang)
         self._cfg.asr.source_language = lang
+        if self._panel:
+            self._panel.set_source_language(lang)
         if self._is_running:
             self._pipeline.update_source_language(lang)
 
@@ -297,6 +338,8 @@ class TrayApplication:
             a.setChecked(c == lang)
         self._cfg.translator.target_language = lang
         self._cfg.translator.target_languages = [lang]
+        if self._panel:
+            self._panel.set_target_language(lang)
         if self._is_running:
             self._pipeline.update_target_language(lang)
 
@@ -306,6 +349,8 @@ class TrayApplication:
         for s, a in getattr(self, "_model_acts_mb", {}).items():
             a.setChecked(s == size)
         self._cfg.asr.model_size = size
+        if self._panel:
+            self._panel.set_model(size)
         if self._is_running:
             self._tray.showMessage(
                 "SubtitleLive",
@@ -317,9 +362,13 @@ class TrayApplication:
         if self._overlay.isVisible():
             self._overlay.hide()
             self._act_overlay.setChecked(False)
+            if self._panel:
+                self._panel.set_overlay_visible(False)
         else:
             self._overlay.show()
             self._act_overlay.setChecked(True)
+            if self._panel:
+                self._panel.set_overlay_visible(True)
 
     def _on_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
