@@ -34,3 +34,16 @@ class SubtitleEvent:
     source_language: str
     target_language: str
     timestamp: float = 0.0
+
+
+@dataclass(frozen=True)
+class AudioDeviceInfo:
+    """统一的音频设备描述, 屏蔽不同平台/后端的设备枚举差异"""
+    device_id: str
+    name: str
+    backend: str
+    platform: str
+    input_channels: int = 0
+    output_channels: int = 0
+    default_sample_rate: float = 0.0
+    is_loopback: bool = False

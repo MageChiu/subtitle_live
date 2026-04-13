@@ -15,7 +15,13 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 
 @dataclass
 class AudioConfig:
+    backend: str = "auto"                   # auto / native_* / sounddevice_loopback
+    device_id: str = ""                     # 统一设备 ID
     device_index: Optional[int] = None      # None → 自动检测
+    capture_mode: str = "system"            # system / microphone / app
+    prefer_native_backend: bool = True
+    allow_sounddevice_fallback: bool = True
+    native_library_path: str = ""
     sample_rate: int = 16000
     channels: int = 1
     chunk_duration: float = 3.0             # 送识别的窗口长度 (秒)
@@ -68,6 +74,7 @@ class AppConfig:
     asr: ASRConfig = field(default_factory=ASRConfig)
     translator: TranslatorConfig = field(default_factory=TranslatorConfig)
     overlay: OverlayConfig = field(default_factory=OverlayConfig)
+    auto_start: bool = False
     log_level: str = "INFO"
     subtitle_log_file: str = ""
 
@@ -88,11 +95,16 @@ class AppConfig:
             return cfg
         try:
             data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+            audio_data = data.get("audio", {})
+            if not audio_data.get("device_id") and audio_data.get("device_index") is not None:
+                audio_data = dict(audio_data)
+                audio_data["device_id"] = str(audio_data["device_index"])
             return cls(
-                audio=AudioConfig(**data.get("audio", {})),
+                audio=AudioConfig(**audio_data),
                 asr=ASRConfig(**data.get("asr", {})),
                 translator=TranslatorConfig(**data.get("translator", {})),
                 overlay=OverlayConfig(**data.get("overlay", {})),
+                auto_start=data.get("auto_start", False),
                 log_level=data.get("log_level", "INFO"),
                 subtitle_log_file=data.get("subtitle_log_file", ""),
             )

@@ -43,6 +43,34 @@ def parse_args():
     p.add_argument("-t", "--target-lang", default="", help="翻译目标语言 (zh/en/ja/...)")
     p.add_argument("-m", "--model", default="", help="模型 (tiny/base/small/medium/large-v3)")
     p.add_argument("--device", default="", help="设备 (auto/cpu/cuda)")
+    p.add_argument(
+        "--audio-backend",
+        default="",
+        help="音频后端 (auto/native_windows_wasapi/native_macos_coreaudio/native_linux_pipewire/sounddevice_loopback)",
+    )
+    p.add_argument("--audio-device-id", default="", help="统一音频设备 ID")
+    p.add_argument(
+        "--capture-mode",
+        default="",
+        choices=["system", "microphone", "app"],
+        help="音频采集模式",
+    )
+    p.add_argument("--native-library-path", default="", help="Native 音频后端动态库路径")
+    p.add_argument(
+        "--disable-native-backend",
+        action="store_true",
+        help="禁用 native-first 策略",
+    )
+    p.add_argument(
+        "--disable-sounddevice-fallback",
+        action="store_true",
+        help="禁用 sounddevice fallback",
+    )
+    p.add_argument(
+        "--auto-start",
+        action="store_true",
+        help="启动后自动开始识别, 适合无法方便操作托盘的场景",
+    )
     p.add_argument("--log-level", default="", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return p.parse_args()
 
@@ -60,6 +88,20 @@ def main():
         config.asr.model_size = args.model
     if args.device:
         config.asr.device = args.device
+    if args.audio_backend:
+        config.audio.backend = args.audio_backend
+    if args.audio_device_id:
+        config.audio.device_id = args.audio_device_id
+    if args.capture_mode:
+        config.audio.capture_mode = args.capture_mode
+    if args.native_library_path:
+        config.audio.native_library_path = args.native_library_path
+    if args.disable_native_backend:
+        config.audio.prefer_native_backend = False
+    if args.disable_sounddevice_fallback:
+        config.audio.allow_sounddevice_fallback = False
+    if args.auto_start:
+        config.auto_start = True
     if args.log_level:
         config.log_level = args.log_level
 

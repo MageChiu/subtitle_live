@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
     QApplication, QSystemTrayIcon, QMenu, QMessageBox,
 )
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QAction
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, QTimer
 
 from core.config import AppConfig
 from core.models import SubtitleEvent
@@ -71,6 +71,7 @@ class TrayApplication:
         self._app = QApplication(sys.argv)
         self._app.setQuitOnLastWindowClosed(False)
         self._app.setApplicationName("SubtitleLive")
+        self._app.setApplicationDisplayName("SubtitleLive")
 
         self._overlay = SubtitleOverlay(self._cfg.overlay)
         self._pipeline = SubtitlePipeline(self._cfg)
@@ -83,6 +84,8 @@ class TrayApplication:
             "AI 字幕已启动，右键托盘图标开始识别",
             QSystemTrayIcon.MessageIcon.Information, 3000,
         )
+        if self._cfg.auto_start:
+            QTimer.singleShot(0, self._start)
         return self._app.exec()
 
     # ---- 托盘 ----

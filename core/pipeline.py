@@ -86,7 +86,6 @@ class SubtitlePipeline:
                 base_url=cfg.translator.openai_base_url,
                 model=cfg.translator.openai_model,
             )
-
         self._model_loaded = True
         logger.info("模型加载完成")
 
@@ -111,7 +110,13 @@ class SubtitlePipeline:
 
         ac = self._cfg.audio
         self._audio_capture = AudioCapture(
+            backend=ac.backend,
+            device_id=ac.device_id,
             device_index=ac.device_index,
+            capture_mode=ac.capture_mode,
+            prefer_native_backend=ac.prefer_native_backend,
+            allow_sounddevice_fallback=ac.allow_sounddevice_fallback,
+            native_library_path=ac.native_library_path,
             sample_rate=ac.sample_rate,
             channels=ac.channels,
             chunk_duration=ac.chunk_duration,

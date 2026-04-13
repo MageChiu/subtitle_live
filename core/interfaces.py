@@ -5,9 +5,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import Callable, List, Optional
 
-from core.models import ASRResult, TranslationResult
+from core.models import ASRResult, AudioDeviceInfo, TranslationResult
 
 
 class ASRPlugin(ABC):
@@ -86,3 +86,65 @@ class TranslatorPlugin(ABC):
     def initialize(self, **kwargs) -> None:
         """初始化引擎 (可选, 如设置 API Key)"""
         pass
+
+
+class AudioCaptureBackend(ABC):
+    """音频采集后端接口
+
+    目标:
+      1. 屏蔽 Windows/macOS/Linux 的系统 API 差异
+      2. 让上层 pipeline 只依赖 PCM chunk 回调
+      3. 允许 Native 后端与 Python fallback 共存
+    """
+
+    @abstractmethod
+    def name(self) -> str:
+        """后端唯一标识 (如 'native_windows_wasapi')"""
+        ...
+
+    @abstractmethod
+    def is_supported(self) -> bool:
+        """当前机器/环境是否支持该后端"""
+        ...
+
+    @abstractmethod
+    def list_devices(self) -> List[AudioDeviceInfo]:
+        """列出该后端可见的设备"""
+        ...
+
+    @abstractmethod
+    def default_device_id(self) -> Optional[str]:
+        """获取最适合的默认设备 ID"""
+        ...
+
+    @abstractmethod
+    def start(self, callback: Callable) -> None:
+        """启动采集, 将 PCM chunk 回调给上层"""
+        ...
+
+    @abstractmethod
+    def stop(self) -> None:
+        """停止采集"""
+        ...
+
+    @property
+    @abstractmethod
+    def is_running(self) -> bool:
+        """运行状态"""
+        ...
+
+    @property
+    @abstractmethod
+    def selected_device_id(self) -> Optional[str]:
+        """当前选择的设备 ID"""
+        ...
+
+    @property
+    @abstractmethod
+    def selected_device_name(self) -> str:
+        """当前选择的设备名称"""
+        ...
+
+    def unavailable_reason(self) -> str:
+        """不可用时的解释, 便于 UI/日志提示"""
+        return ""

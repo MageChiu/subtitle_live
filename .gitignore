@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Test and tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local debug artifacts
+.dbg/
+*.ndjson
+
+# Build artifacts
+build/
+dist/
+
+# IDE/editor
+.idea/
+.vscode/
