@@ -140,7 +140,7 @@ class SubtitleOverlay(QWidget):
         if self._cfg.show_original:
             self._lbl_orig.setText(event.original_text)
         if self._cfg.show_translated:
-            self._lbl_trans.setText(event.translated_text)
+            self._lbl_trans.setText(self._format_translations(event))
         if not self.isVisible():
             self.show()
 
@@ -253,3 +253,12 @@ class SubtitleOverlay(QWidget):
     def _set_opacity(self, v: float):
         self._cfg.opacity = v
         self.update()
+
+    @staticmethod
+    def _format_translations(event: SubtitleEvent) -> str:
+        if event.translations:
+            return "\n".join(
+                f"[{lang}] {text}" if len(event.translations) > 1 else text
+                for lang, text in event.translations
+            )
+        return event.translated_text

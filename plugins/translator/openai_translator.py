@@ -20,7 +20,7 @@ from core.plugin_registry import PluginRegistry
 logger = logging.getLogger(__name__)
 
 LANGUAGE_NAMES = {
-    "zh": "Chinese (Simplified)", "en": "English",
+    "zh": "Chinese (Simplified)", "zh-TW": "Chinese (Traditional)", "en": "English",
     "ja": "Japanese", "fr": "French", "de": "German",
     "es": "Spanish", "ko": "Korean", "ru": "Russian",
     "it": "Italian", "pt": "Portuguese", "ar": "Arabic",

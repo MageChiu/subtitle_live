@@ -3,10 +3,10 @@ PYTHON ?= python3
 .PHONY: build run build-windows build-macos build-linux run-windows run-macos run-linux
 
 build:
-	$(PYTHON) scripts/build.py
+	$(PYTHON) scripts/build.py $(ARGS)
 
 run:
-	$(PYTHON) scripts/run.py
+	$(PYTHON) scripts/run.py $(ARGS)
 
 build-windows:
 	$(PYTHON) scripts/build.py --platform windows

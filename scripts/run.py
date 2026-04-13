@@ -20,6 +20,11 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
         default="auto",
         help="音频后端 (auto/native_*/sounddevice_loopback)",
     )
+    parser.add_argument(
+        "--target-lang",
+        default="",
+        help="翻译目标语言, 支持逗号分隔多目标 (如 zh,ja 或 zh-TW)",
+    )
     parser.add_argument("--audio-device-id", default="", help="统一音频设备 ID")
     parser.add_argument(
         "--capture-mode",
@@ -63,6 +68,8 @@ def main() -> int:
         )
 
     command = [python_executable(), str(MAIN_FILE)]
+    if args.target_lang:
+        command.extend(["--target-lang", args.target_lang])
     if args.audio_backend and args.audio_backend != "auto":
         command.extend(["--audio-backend", args.audio_backend])
     if args.audio_device_id:

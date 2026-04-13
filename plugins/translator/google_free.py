@@ -30,7 +30,7 @@ _UA = (
 
 # 所有支持的目标语言
 SUPPORTED = [
-    "zh", "en", "ja", "fr", "de", "es",
+    "zh", "zh-TW", "en", "ja", "fr", "de", "es",
     "ko", "ru", "it", "pt", "ar", "hi", "th", "vi",
 ]
 

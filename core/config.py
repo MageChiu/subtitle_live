@@ -44,6 +44,7 @@ class ASRConfig:
 class TranslatorConfig:
     engine: str = "google_free"             # google_free / openai
     target_language: str = "zh"
+    target_languages: list[str] = field(default_factory=lambda: ["zh"])
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     openai_base_url: str = ""
@@ -99,10 +100,16 @@ class AppConfig:
             if not audio_data.get("device_id") and audio_data.get("device_index") is not None:
                 audio_data = dict(audio_data)
                 audio_data["device_id"] = str(audio_data["device_index"])
+            translator_data = data.get("translator", {})
+            if not translator_data.get("target_languages"):
+                translator_data = dict(translator_data)
+                translator_data["target_languages"] = [
+                    translator_data.get("target_language", "zh")
+                ]
             return cls(
                 audio=AudioConfig(**audio_data),
                 asr=ASRConfig(**data.get("asr", {})),
-                translator=TranslatorConfig(**data.get("translator", {})),
+                translator=TranslatorConfig(**translator_data),
                 overlay=OverlayConfig(**data.get("overlay", {})),
                 auto_start=data.get("auto_start", False),
                 log_level=data.get("log_level", "INFO"),

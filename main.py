@@ -40,7 +40,7 @@ def setup_logging(level: str = "INFO"):
 def parse_args():
     p = argparse.ArgumentParser(description="SubtitleLive - AI 实时字幕软件")
     p.add_argument("-s", "--source-lang", default="", help="识别语言 (auto/en/ja/fr/...)")
-    p.add_argument("-t", "--target-lang", default="", help="翻译目标语言 (zh/en/ja/...)")
+    p.add_argument("-t", "--target-lang", default="", help="翻译目标语言, 支持逗号分隔多目标 (zh/zh-TW/ja/...)")
     p.add_argument("-m", "--model", default="", help="模型 (tiny/base/small/medium/large-v3)")
     p.add_argument("--device", default="", help="设备 (auto/cpu/cuda)")
     p.add_argument(
@@ -83,7 +83,10 @@ def main():
     if args.source_lang:
         config.asr.source_language = args.source_lang
     if args.target_lang:
-        config.translator.target_language = args.target_lang
+        targets = [item.strip() for item in args.target_lang.split(",") if item.strip()]
+        if targets:
+            config.translator.target_languages = targets
+            config.translator.target_language = targets[0]
     if args.model:
         config.asr.model_size = args.model
     if args.device:

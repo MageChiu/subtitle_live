@@ -1,27 +1,20 @@
 # Debug Session
 
-- Status: FIXED
+- Status: OPEN
 - Date: 2026-04-11
 - Project: subtitle_live
-- Symptom: `make run` 在当前 macOS + Loopback 场景下“看起来没有生效”，用户预期是一条可直接工作的默认运行入口。
+- Symptom: 目标语言无法按预期设置，例如希望输出中文繁体或日语时，实际结果仍然不是期望语言。
 
 ## Falsifiable Hypotheses
 
-1. `make run` 只是调用了一个过于“通用”的默认命令，没有把当前 macOS 所需的 `--auto-start` / `--audio-device-id` 等参数带进去。
-2. `scripts/run.py` 的默认参数在 macOS 上会走到不适合当前用户环境的路径，导致“命令成功执行，但体验上等于没启动”。
-3. 当前本地配置文件中的持久化值与用户现在的 Loopback 设备选择不一致，导致 `make run` 读取了错误的默认设备或启动策略。
-4. `Makefile` 入口本身没有问题，真正的问题是 macOS 上默认 GUI 交互入口仍然依赖用户找到托盘，而 `make run` 没有显式绕开这一点。
+1. macOS 上用户无法稳定通过托盘菜单操作，导致目标语言设置动作根本没有发生。
+2. UI 的目标语言列表或配置结构没有覆盖用户需要的语言代码，例如 `zh-TW`。
+3. 翻译插件虽然收到切换请求，但并不支持该目标语言，或内部把它回退到默认值。
+4. 配置层中的目标语言值改变了，但运行中的字幕管线没有读取到更新后的值。
 
 ## Evidence Log
 
-- Bootstrap completed. No business logic modified.
-- Runtime evidence for `make run`:
-  - `make -n run` expands to `python3 scripts/run.py`.
-  - Before the fix, `python3 scripts/run.py --dry-run` expanded to bare `main.py` with no `--auto-start`.
-  - Current local audio enumeration includes `SubtitleLive Audio` as device `7`.
-  - Before the fix, `AudioCapture.find_loopback_device()` resolved to `4` (`BlackHole 2ch`), not the Loopback virtual input.
-  - After the fix, `python3 scripts/run.py --dry-run` expands to `main.py --auto-start`.
-  - After the fix, `AudioCapture.find_loopback_device()` resolves to `7`, which matches the user-created Loopback virtual input.
+- Bootstrap completed. No business logic modified for this issue yet.
 - Environment bootstrap initially failed in local verification: `PyQt6` and `sounddevice` were not installed.
 - Runtime evidence from `.dbg/trae-debug-log-subtitle-live-20260411-01.ndjson`:
   - `core/audio_capture.py:find_loopback_device` reported `os=Darwin`, `default_input_name=MacBook Pro麦克风`.
@@ -47,6 +40,6 @@
 
 ## Next Steps
 
-1. `make run` on macOS now injects `--auto-start` through `scripts/run.py`.
-2. Default sounddevice device selection on macOS now prefers user-created stereo virtual input devices such as Loopback outputs.
-3. Keep `debug.md` only as a retained record because file deletion was skipped by user preference.
+1. Read target-language related UI, config, and translator code paths.
+2. Add minimal instrumentation around target-language selection and translation execution.
+3. Ask user to reproduce once the observation points are in place.

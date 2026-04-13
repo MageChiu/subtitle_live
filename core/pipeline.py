@@ -148,7 +148,14 @@ class SubtitlePipeline:
         self._cfg.asr.source_language = lang
 
     def update_target_language(self, lang: str) -> None:
+        # #region debug-point B:update-target-language
+        try:
+            import json, urllib.request; urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:7777/event", data=json.dumps({"sessionId": "subtitle-live-20260413-target-lang", "runId": "pre-fix", "hypothesisId": "B", "location": "core/pipeline.py:update_target_language", "msg": "[DEBUG] 管线更新目标语言", "data": {"target_language": lang}}).encode(), headers={"Content-Type": "application/json"}), timeout=0.2).read()
+        except Exception:
+            pass
+        # #endregion
         self._cfg.translator.target_language = lang
+        self._cfg.translator.target_languages = [lang]
 
     # ---- Workers ----
 
@@ -202,39 +209,57 @@ class SubtitlePipeline:
 
     def _trans_worker(self) -> None:
         logger.info("翻译 worker 启动")
+        debug_target_logged = False
         while self._running:
             try:
                 asr_res: ASRResult = self._text_q.get(timeout=0.5)
             except queue.Empty:
                 continue
 
-            target = self._cfg.translator.target_language
+            targets = tuple(
+                lang for lang in self._cfg.translator.target_languages
+                if lang and lang.strip()
+            ) or (self._cfg.translator.target_language,)
+            target = targets[0]
             original = asr_res.text
-
-            if asr_res.language == target:
-                translated = original
-            else:
+            if not debug_target_logged:
+                debug_target_logged = True
+                # #region debug-point C:first-translate-target
                 try:
-                    tr = self._translator.translate(original, asr_res.language, target)
-                    translated = tr.translated if tr else "[翻译失败]"
-                except Exception as e:
-                    logger.error("翻译异常: %s", e)
-                    translated = "[翻译异常]"
+                    import json, urllib.request; urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:7777/event", data=json.dumps({"sessionId": "subtitle-live-20260413-target-lang", "runId": "pre-fix", "hypothesisId": "C", "location": "core/pipeline.py:_trans_worker", "msg": "[DEBUG] 翻译线程读取到首个目标语言", "data": {"target_language": target, "target_languages": list(targets), "source_language": asr_res.language, "original_preview": original[:80]}}).encode(), headers={"Content-Type": "application/json"}), timeout=0.2).read()
+                except Exception:
+                    pass
+                # #endregion
+            translations: list[tuple[str, str]] = []
+            for current_target in targets:
+                if asr_res.language == current_target:
+                    current_translated = original
+                else:
+                    try:
+                        tr = self._translator.translate(original, asr_res.language, current_target)
+                        current_translated = tr.translated if tr else "[翻译失败]"
+                    except Exception as e:
+                        logger.error("翻译异常: %s", e)
+                        current_translated = "[翻译异常]"
+                translations.append((current_target, current_translated))
+            translated = translations[0][1] if translations else original
 
             event = SubtitleEvent(
                 original_text=original,
                 translated_text=translated,
                 source_language=asr_res.language,
                 target_language=target,
+                translations=tuple(translations),
                 timestamp=time.time(),
             )
 
             if self._log_fh:
                 try:
                     ts = time.strftime("%H:%M:%S")
+                    joined = " || ".join(f"{lang}:{text}" for lang, text in translations)
                     self._log_fh.write(
-                        f"[{ts}] [{asr_res.language}→{target}] "
-                        f"{original} | {translated}\n"
+                        f"[{ts}] [{asr_res.language}→{','.join(targets)}] "
+                        f"{original} | {joined}\n"
                     )
                     self._log_fh.flush()
                 except Exception:

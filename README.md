@@ -89,6 +89,7 @@ python3 scripts/run.py --audio-backend sounddevice_loopback --audio-device-id 7 
 - `scripts/run.py` 负责统一运行入口，可注入音频后端、设备 ID、capture mode 等参数。
 - `Makefile` 负责给类 Unix 开发环境提供标准入口；Windows 上可直接执行 `python scripts/build.py` 和 `python scripts/run.py`。
 - `--auto-start` 适合 macOS 上只看到 Dock 图标、不方便通过菜单栏托盘手动点击“开始识别”的场景。
+- 在 macOS 上，`make run` 现在会默认走自动开始识别路径，避免因为托盘不易发现而看起来“没有生效”。
 
 ### macOS 额外前提
 

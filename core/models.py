@@ -33,6 +33,7 @@ class SubtitleEvent:
     translated_text: str
     source_language: str
     target_language: str
+    translations: tuple[tuple[str, str], ...] = ()
     timestamp: float = 0.0
 
 

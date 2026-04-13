@@ -13,12 +13,13 @@
 from __future__ import annotations
 
 import logging
+import platform
 import sys
 import traceback
 from typing import Optional
 
 from PyQt6.QtWidgets import (
-    QApplication, QSystemTrayIcon, QMenu, QMessageBox,
+    QApplication, QSystemTrayIcon, QMenu, QMessageBox, QMainWindow,
 )
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QAction
 from PyQt6.QtCore import Qt, QSize, QTimer
@@ -41,7 +42,8 @@ SOURCE_LANGUAGES = {
 }
 
 TARGET_LANGUAGES = {
-    "zh": "🇨🇳 中文",    "en": "🇬🇧 English",
+    "zh": "🇨🇳 中文简体", "zh-TW": "🇭🇰 中文繁體",
+    "en": "🇬🇧 English",
     "ja": "🇯🇵 日本語",  "fr": "🇫🇷 Français",
     "de": "🇩🇪 Deutsch", "es": "🇪🇸 Español",
     "ko": "🇰🇷 한국어",
@@ -63,6 +65,7 @@ class TrayApplication:
         self._cfg = config
         self._app: Optional[QApplication] = None
         self._tray: Optional[QSystemTrayIcon] = None
+        self._menu_host: Optional[QMainWindow] = None
         self._overlay: Optional[SubtitleOverlay] = None
         self._pipeline: Optional[SubtitlePipeline] = None
         self._is_running = False
@@ -76,8 +79,15 @@ class TrayApplication:
         self._overlay = SubtitleOverlay(self._cfg.overlay)
         self._pipeline = SubtitlePipeline(self._cfg)
         self._pipeline.set_subtitle_callback(self._on_subtitle)
+        # #region debug-point A:startup-target-language
+        try:
+            import json, urllib.request; urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:7777/event", data=json.dumps({"sessionId": "subtitle-live-20260413-target-lang", "runId": "pre-fix", "hypothesisId": "A", "location": "ui/tray.py:run", "msg": "[DEBUG] 应用启动时读取的目标语言", "data": {"target_language": self._cfg.translator.target_language, "translator_engine": self._cfg.translator.engine, "auto_start": self._cfg.auto_start}}).encode(), headers={"Content-Type": "application/json"}), timeout=0.2).read()
+        except Exception:
+            pass
+        # #endregion
 
         self._build_tray()
+        self._build_menu_bar()
 
         self._tray.showMessage(
             "SubtitleLive",
@@ -91,6 +101,8 @@ class TrayApplication:
     # ---- 托盘 ----
 
     def _build_tray(self):
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            logger.warning("系统托盘不可用，建议使用顶部菜单栏入口或启用 --auto-start")
         self._tray = QSystemTrayIcon(self._app)
         self._tray.setIcon(self._make_icon())
         self._tray.setToolTip("SubtitleLive - AI 实时字幕")
@@ -150,6 +162,42 @@ class TrayApplication:
         self._tray.activated.connect(self._on_activated)
         self._tray.show()
 
+    def _build_menu_bar(self) -> None:
+        """跨平台兜底控制入口.
+
+        macOS 上即使托盘图标“可见”，也经常出现用户难以发现/操作的情况。
+        顶部菜单栏入口能保证 macOS/Windows 都可操作。
+        """
+        self._menu_host = QMainWindow()
+        self._menu_host.setWindowTitle("SubtitleLive")
+        self._menu_host.setWindowIcon(self._make_icon())
+        self._menu_host.hide()
+
+        bar = self._menu_host.menuBar()
+        main = bar.addMenu("SubtitleLive")
+
+        # 复用同一组 QAction，避免状态分叉
+        main.addAction(self._act_toggle)
+        main.addSeparator()
+
+        self._src_acts_mb = self._add_radio_submenu(
+            main, "识别语言", SOURCE_LANGUAGES,
+            self._cfg.asr.source_language, self._set_src,
+        )
+        self._tgt_acts_mb = self._add_radio_submenu(
+            main, "翻译语言", TARGET_LANGUAGES,
+            self._cfg.translator.target_language, self._set_tgt,
+        )
+        self._model_acts_mb = self._add_radio_submenu(
+            main, "模型", MODEL_SIZES,
+            self._cfg.asr.model_size, self._set_model,
+        )
+
+        main.addSeparator()
+        main.addAction(self._act_overlay)
+        main.addSeparator()
+        main.addAction("退出", self._quit)
+
     def _add_radio_submenu(self, parent_menu, title, options, current, setter):
         """创建单选子菜单, 返回 {code: QAction}"""
         sub = parent_menu.addMenu(title)
@@ -165,6 +213,18 @@ class TrayApplication:
 
     @staticmethod
     def _make_icon() -> QIcon:
+        if platform.system() == "Darwin":
+            # macOS 菜单栏图标更适合“单色模板”样式，否则在深色/浅色模式下可能不易辨认
+            px = QPixmap(QSize(18, 18))
+            px.fill(QColor(0, 0, 0, 0))
+            p = QPainter(px)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            p.setPen(QColor(0, 0, 0, 255))
+            p.setFont(QFont("Arial", 13, QFont.Weight.Bold))
+            p.drawText(px.rect(), Qt.AlignmentFlag.AlignCenter, "S")
+            p.end()
+            return QIcon(px)
+
         px = QPixmap(QSize(64, 64))
         px.fill(QColor(0, 0, 0, 0))
         p = QPainter(px)
@@ -218,19 +278,32 @@ class TrayApplication:
     def _set_src(self, lang: str):
         for c, a in self._src_acts.items():
             a.setChecked(c == lang)
+        for c, a in getattr(self, "_src_acts_mb", {}).items():
+            a.setChecked(c == lang)
         self._cfg.asr.source_language = lang
         if self._is_running:
             self._pipeline.update_source_language(lang)
 
     def _set_tgt(self, lang: str):
+        # #region debug-point B:set-target-language
+        try:
+            import json, urllib.request; urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:7777/event", data=json.dumps({"sessionId": "subtitle-live-20260413-target-lang", "runId": "pre-fix", "hypothesisId": "B", "location": "ui/tray.py:_set_tgt", "msg": "[DEBUG] 用户切换目标语言", "data": {"selected_target_language": lang, "was_running": self._is_running}}).encode(), headers={"Content-Type": "application/json"}), timeout=0.2).read()
+        except Exception:
+            pass
+        # #endregion
         for c, a in self._tgt_acts.items():
             a.setChecked(c == lang)
+        for c, a in getattr(self, "_tgt_acts_mb", {}).items():
+            a.setChecked(c == lang)
         self._cfg.translator.target_language = lang
+        self._cfg.translator.target_languages = [lang]
         if self._is_running:
             self._pipeline.update_target_language(lang)
 
     def _set_model(self, size: str):
         for s, a in self._model_acts.items():
+            a.setChecked(s == size)
+        for s, a in getattr(self, "_model_acts_mb", {}).items():
             a.setChecked(s == size)
         self._cfg.asr.model_size = size
         if self._is_running:
