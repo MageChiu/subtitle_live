@@ -79,6 +79,10 @@ class SoundDeviceLoopbackBackend(AudioCaptureBackend):
 
             devices = sd.query_devices()
             os_name = platform.system()
+            if os_name == "Darwin":
+                preferred = self._find_preferred_macos_virtual_input(devices)
+                if preferred is not None:
+                    return preferred
             keywords = {
                 "Windows": ["stereo mix", "loopback", "what u hear", "wave out"],
                 "Darwin": ["blackhole", "soundflower", "loopback"],
@@ -214,6 +218,21 @@ class SoundDeviceLoopbackBackend(AudioCaptureBackend):
             if device.device_id == str(device_id):
                 return device.name
         return str(device_id)
+
+    @staticmethod
+    def _find_preferred_macos_virtual_input(devices) -> Optional[str]:
+        for i, d in enumerate(devices):
+            name = d["name"].lower()
+            if d["max_input_channels"] < 2:
+                continue
+            if d["max_output_channels"] != 0:
+                continue
+            if any(token in name for token in (
+                "microphone", "mic", "麦克风", "blackhole", "soundflower", "loopback",
+            )):
+                continue
+            return str(i)
+        return None
 
     @staticmethod
     def _is_loopback(name: str) -> bool:

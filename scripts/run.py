@@ -75,7 +75,8 @@ def main() -> int:
         command.append("--disable-native-backend")
     if args.disable_sounddevice_fallback:
         command.append("--disable-sounddevice-fallback")
-    if args.auto_start:
+    effective_auto_start = args.auto_start or target_platform == "macos"
+    if effective_auto_start:
         command.append("--auto-start")
     command.extend(passthrough)
 

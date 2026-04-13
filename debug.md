@@ -3,19 +3,25 @@
 - Status: FIXED
 - Date: 2026-04-11
 - Project: subtitle_live
-- Symptom: 后台运行后，前台预期应以类似 QQ 音乐歌词悬浮窗样式显示当前视频字幕与翻译，但当前“不工作”。
+- Symptom: `make run` 在当前 macOS + Loopback 场景下“看起来没有生效”，用户预期是一条可直接工作的默认运行入口。
 
 ## Falsifiable Hypotheses
 
-1. 悬浮窗 UI 没有被真正创建或显示，导致后台程序在运行但前台完全无窗口。
-2. 音频采集或 ASR 管线没有产出字幕事件，导致悬浮窗存在但始终无内容。
-3. 翻译插件初始化失败或阻塞，导致整条字幕更新链路中断。
-4. 托盘/主线程事件循环与悬浮窗更新线程配合异常，导致窗口生命周期或 UI 刷新失效。
-5. 配置默认值、依赖或平台权限与 README 假设不一致，导致功能在本机环境下无法启动。
+1. `make run` 只是调用了一个过于“通用”的默认命令，没有把当前 macOS 所需的 `--auto-start` / `--audio-device-id` 等参数带进去。
+2. `scripts/run.py` 的默认参数在 macOS 上会走到不适合当前用户环境的路径，导致“命令成功执行，但体验上等于没启动”。
+3. 当前本地配置文件中的持久化值与用户现在的 Loopback 设备选择不一致，导致 `make run` 读取了错误的默认设备或启动策略。
+4. `Makefile` 入口本身没有问题，真正的问题是 macOS 上默认 GUI 交互入口仍然依赖用户找到托盘，而 `make run` 没有显式绕开这一点。
 
 ## Evidence Log
 
 - Bootstrap completed. No business logic modified.
+- Runtime evidence for `make run`:
+  - `make -n run` expands to `python3 scripts/run.py`.
+  - Before the fix, `python3 scripts/run.py --dry-run` expanded to bare `main.py` with no `--auto-start`.
+  - Current local audio enumeration includes `SubtitleLive Audio` as device `7`.
+  - Before the fix, `AudioCapture.find_loopback_device()` resolved to `4` (`BlackHole 2ch`), not the Loopback virtual input.
+  - After the fix, `python3 scripts/run.py --dry-run` expands to `main.py --auto-start`.
+  - After the fix, `AudioCapture.find_loopback_device()` resolves to `7`, which matches the user-created Loopback virtual input.
 - Environment bootstrap initially failed in local verification: `PyQt6` and `sounddevice` were not installed.
 - Runtime evidence from `.dbg/trae-debug-log-subtitle-live-20260411-01.ndjson`:
   - `core/audio_capture.py:find_loopback_device` reported `os=Darwin`, `default_input_name=MacBook Pro麦克风`.
@@ -41,6 +47,6 @@
 
 ## Next Steps
 
-1. Keep instrumentation in place until user confirms the fix direction.
-2. Verify the minimal fix that bypasses tray dependence via `--auto-start`.
-3. If the user still sees no subtitle after auto-start, continue with audio/ASR path verification.
+1. `make run` on macOS now injects `--auto-start` through `scripts/run.py`.
+2. Default sounddevice device selection on macOS now prefers user-created stereo virtual input devices such as Loopback outputs.
+3. Keep `debug.md` only as a retained record because file deletion was skipped by user preference.
