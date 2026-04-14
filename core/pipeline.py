@@ -157,6 +157,13 @@ class SubtitlePipeline:
         self._cfg.translator.target_language = lang
         self._cfg.translator.target_languages = [lang]
 
+    def update_target_languages(self, languages: list[str]) -> None:
+        cleaned = [lang for lang in languages if lang and lang.strip()]
+        if not cleaned:
+            cleaned = ["zh"]
+        self._cfg.translator.target_languages = cleaned
+        self._cfg.translator.target_language = cleaned[0]
+
     # ---- Workers ----
 
     def _on_audio(self, chunk: np.ndarray) -> None:

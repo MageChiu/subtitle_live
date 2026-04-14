@@ -211,7 +211,7 @@ class TrayApplication:
             target_options=TARGET_LANGUAGES,
             model_options=MODEL_SIZES,
             current_source=self._cfg.asr.source_language,
-            current_target=self._cfg.translator.target_language,
+            current_targets=tuple(self._cfg.translator.target_languages),
             current_model=self._cfg.asr.model_size,
             overlay_visible=True,
         )
@@ -219,7 +219,7 @@ class TrayApplication:
         self._panel.set_handlers(
             on_toggle=self._toggle,
             on_source=self._set_src,
-            on_target=self._set_tgt,
+            on_targets=self._set_targets,
             on_model=self._set_model,
             on_overlay=self._toggle_overlay,
             on_quit=self._quit,
@@ -342,6 +342,22 @@ class TrayApplication:
             self._panel.set_target_language(lang)
         if self._is_running:
             self._pipeline.update_target_language(lang)
+
+    def _set_targets(self, languages: list[str]):
+        cleaned = [lang for lang in languages if lang in TARGET_LANGUAGES]
+        if not cleaned:
+            cleaned = ["zh"]
+        primary = cleaned[0]
+        for c, a in self._tgt_acts.items():
+            a.setChecked(c == primary)
+        for c, a in getattr(self, "_tgt_acts_mb", {}).items():
+            a.setChecked(c == primary)
+        self._cfg.translator.target_language = primary
+        self._cfg.translator.target_languages = cleaned
+        if self._panel:
+            self._panel.set_target_languages(tuple(cleaned))
+        if self._is_running:
+            self._pipeline.update_target_languages(cleaned)
 
     def _set_model(self, size: str):
         for s, a in self._model_acts.items():

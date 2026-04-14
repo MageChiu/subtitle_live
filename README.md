@@ -83,6 +83,9 @@ python3 scripts/run.py --audio-backend sounddevice_loopback --log-level DEBUG
 
 # macOS 上如果菜单栏托盘不易发现, 可直接自动开始识别
 python3 scripts/run.py --audio-backend sounddevice_loopback --audio-device-id 7 --auto-start --log-level DEBUG
+
+# 双目标/多目标翻译
+python3 scripts/run.py --target-lang zh-TW,ja --auto-start
 ```
 
 - `scripts/build.py` 负责按平台生成构建配置、执行 Python 字节码校验，并产出平台 manifest。
@@ -90,6 +93,8 @@ python3 scripts/run.py --audio-backend sounddevice_loopback --audio-device-id 7 
 - `Makefile` 负责给类 Unix 开发环境提供标准入口；Windows 上可直接执行 `python scripts/build.py` 和 `python scripts/run.py`。
 - `--auto-start` 适合 macOS 上只看到 Dock 图标、不方便通过菜单栏托盘手动点击“开始识别”的场景。
 - 在 macOS 上，`make run` 现在会默认走自动开始识别路径，避免因为托盘不易发现而看起来“没有生效”。
+- `--target-lang` 支持逗号分隔多目标语言，例如 `zh-TW,ja`。
+- 控制面板现在也支持多选翻译语言；托盘/菜单栏单选仍会把第一项作为主目标语言。
 
 ### macOS 额外前提
 
