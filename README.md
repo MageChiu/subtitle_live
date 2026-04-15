@@ -95,6 +95,18 @@ python3 scripts/run.py --target-lang zh-TW,ja --auto-start
 - 在 macOS 上，`make run` 现在会默认走自动开始识别路径，避免因为托盘不易发现而看起来“没有生效”。
 - `--target-lang` 支持逗号分隔多目标语言，例如 `zh-TW,ja`。
 - 控制面板现在也支持多选翻译语言；托盘/菜单栏单选仍会把第一项作为主目标语言。
+- 实时模式默认已切到偏低延迟配置：更短音频分块、较小 `beam_size`、队列“丢旧保新”。
+
+### Windows 额外说明
+
+- 当前已实现 `native_windows_wasapi`，使用 `SoundCard + WASAPI loopback` 直接抓取系统播放音频。
+- 与 macOS 不同，Windows 通常不需要额外安装 `BlackHole` 这类虚拟音频设备。
+- 首次安装依赖时会自动按平台拉取 `soundcard`：
+
+```bash
+pip install -r requirements.txt
+python scripts/run.py --audio-backend native_windows_wasapi
+```
 
 ### macOS 额外前提
 
@@ -145,11 +157,21 @@ python3 scripts/run.py --audio-backend sounddevice_loopback --log-level DEBUG
 
 - `audio_capture.py` 现在只作为统一入口, 上层 `pipeline` 不再直接依赖某个平台 API。
 - 默认策略是 `native-first`:
-  - `Windows` 预留 `native_windows_wasapi`
+  - `Windows` 已实现 `native_windows_wasapi`
   - `macOS` 预留 `native_macos_coreaudio`
   - `Linux` 预留 `native_linux_pipewire`
 - 当前仓库里真正可运行的是 `sounddevice_loopback` fallback, 适合虚拟声卡或 loopback 输入场景。
-- 后续可将 Rust/C 动态库接入 `native_*` 后端, 而无需改动 ASR、翻译和 UI 管线。
+- Windows 当前通过 Python `SoundCard` 走 WASAPI loopback；后续仍可替换成 Rust/C 动态库而无需改动 ASR、翻译和 UI 管线。
+
+### 低延迟建议
+
+- 当前默认实时参数已优化为:
+  - `chunk_duration=1.0`
+  - `overlap_duration=0.2`
+  - `beam_size=1`
+- 如果你主要看英文或日文视频，建议显式指定识别语言，而不是保留 `auto`。
+- 当机器性能不足时，程序现在会优先丢弃过旧音频块，保留最新内容，避免字幕延迟积压到分钟级。
+- 如果更追求准确率而不是实时性，建议后续走“离线生成字幕文件”模式。
 
 ## 扩展新引擎
 
@@ -206,7 +228,7 @@ Audio Capture ──▶ Queue ──▶ ASR Worker ──▶ Queue ──▶ Tra
 ```text
 AudioCapture Facade
   └── Backend Selector
-      ├── native_windows_wasapi   (预留)
+      ├── native_windows_wasapi   (已实现, SoundCard + WASAPI)
       ├── native_macos_coreaudio  (预留)
       ├── native_linux_pipewire   (预留)
       └── sounddevice_loopback    (当前 fallback)

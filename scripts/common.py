@@ -41,7 +41,7 @@ def default_audio_backend(target_platform: str) -> str:
 
 def platform_notes(target_platform: str) -> str:
     return {
-        "windows": "推荐长期实现: WASAPI loopback Native 后端",
+        "windows": "当前已实现: Python SoundCard + WASAPI loopback；长期可继续替换为 Rust/C 后端",
         "macos": "推荐长期实现: ScreenCaptureKit/CoreAudio Native 后端，虚拟设备作为 fallback",
         "linux": "推荐长期实现: PipeWire/PulseAudio monitor Native 后端",
     }[target_platform]

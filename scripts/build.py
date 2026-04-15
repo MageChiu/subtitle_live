@@ -76,7 +76,7 @@ def main() -> int:
         "artifacts": {
             "entry": "main.py",
             "build_dir": str(build_dir),
-            "native_status": "placeholder",
+            "native_status": _audio_backend_status(target_platform),
         },
     }
     write_json(manifest_file, manifest)
@@ -85,8 +85,17 @@ def main() -> int:
     print(f"[build] default-audio-backend={manifest['default_audio_backend']}")
     print(f"[build] manifest={manifest_file}")
     if host_platform != target_platform:
-        print("[build] note=当前仅生成目标平台构建配置与校验结果，Native 后端仍需在目标平台实现与编译")
+        if target_platform == "windows":
+            print("[build] note=当前已生成 Windows 构建配置；WASAPI 后端已实现，但仍需在 Windows 主机上安装依赖并实际运行验证")
+        else:
+            print("[build] note=当前仅生成目标平台构建配置与校验结果，目标平台后端仍需在该平台实现与验证")
     return 0
+
+
+def _audio_backend_status(target_platform: str) -> str:
+    if target_platform == "windows":
+        return "implemented-python-wasapi"
+    return "placeholder"
 
 
 if __name__ == "__main__":

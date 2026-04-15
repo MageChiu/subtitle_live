@@ -24,8 +24,8 @@ class AudioConfig:
     native_library_path: str = ""
     sample_rate: int = 16000
     channels: int = 1
-    chunk_duration: float = 3.0             # 送识别的窗口长度 (秒)
-    overlap_duration: float = 0.5           # 窗口重叠 (秒)
+    chunk_duration: float = 1.0             # 送识别的窗口长度 (秒), 默认偏低延迟
+    overlap_duration: float = 0.2           # 窗口重叠 (秒)
     vad_threshold: float = 0.01             # 静音 RMS 阈值
 
 
@@ -36,7 +36,7 @@ class ASRConfig:
     device: str = "auto"                    # auto / cpu / cuda
     compute_type: str = "int8"
     source_language: str = "auto"           # auto 或 ISO 639-1
-    beam_size: int = 5
+    beam_size: int = 1                      # 实时模式默认更偏低延迟
     vad_filter: bool = True
 
 
@@ -100,6 +100,18 @@ class AppConfig:
             if not audio_data.get("device_id") and audio_data.get("device_index") is not None:
                 audio_data = dict(audio_data)
                 audio_data["device_id"] = str(audio_data["device_index"])
+            # 兼容迁移: 旧版本的默认延迟配置偏大, 仅在仍等于旧默认值时自动升级
+            if (
+                audio_data.get("chunk_duration") == 3.0
+                and audio_data.get("overlap_duration") == 0.5
+            ):
+                audio_data = dict(audio_data)
+                audio_data["chunk_duration"] = 1.0
+                audio_data["overlap_duration"] = 0.2
+            asr_data = data.get("asr", {})
+            if asr_data.get("beam_size") == 5:
+                asr_data = dict(asr_data)
+                asr_data["beam_size"] = 1
             translator_data = data.get("translator", {})
             if not translator_data.get("target_languages"):
                 translator_data = dict(translator_data)
@@ -108,7 +120,7 @@ class AppConfig:
                 ]
             return cls(
                 audio=AudioConfig(**audio_data),
-                asr=ASRConfig(**data.get("asr", {})),
+                asr=ASRConfig(**asr_data),
                 translator=TranslatorConfig(**translator_data),
                 overlay=OverlayConfig(**data.get("overlay", {})),
                 auto_start=data.get("auto_start", False),

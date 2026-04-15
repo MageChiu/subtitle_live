@@ -34,6 +34,8 @@ class WhisperASR(ASRPlugin):
     def __init__(self):
         self._model = None
         self._model_size: Optional[str] = None
+        self._beam_size: int = 1
+        self._vad_filter: bool = True
 
     def name(self) -> str:
         return "whisper"
@@ -70,10 +72,15 @@ class WhisperASR(ASRPlugin):
         if device == "cpu" and compute_type == "float16":
             compute_type = "int8"
 
+        # 兼容: 允许后续通过 `set_runtime_options()` 调整推理参数而无需重载模型
         logger.info("加载 Whisper: %s (device=%s, compute=%s)", model_size, device, compute_type)
         self._model = WhisperModel(model_size, device=device, compute_type=compute_type)
         self._model_size = model_size
         logger.info("Whisper 模型就绪: %s", model_size)
+
+    def set_runtime_options(self, beam_size: int = 1, vad_filter: bool = True) -> None:
+        self._beam_size = max(1, int(beam_size or 1))
+        self._vad_filter = bool(vad_filter)
 
     def transcribe(
         self,
@@ -100,8 +107,8 @@ class WhisperASR(ASRPlugin):
             segments_iter, info = self._model.transcribe(
                 audio_data,
                 language=language,
-                beam_size=5,
-                vad_filter=True,
+                beam_size=self._beam_size,
+                vad_filter=self._vad_filter,
                 vad_parameters=dict(min_silence_duration_ms=500, speech_pad_ms=200),
                 without_timestamps=True,
             )

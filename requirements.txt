@@ -5,6 +5,7 @@
 # === 核心 ===
 PyQt6>=6.5.0                # GUI 框架 (悬浮窗 + 系统托盘)
 sounddevice>=0.4.6          # 音频捕获 (Loopback)
+soundcard>=0.4.3; platform_system == "Windows"  # Windows WASAPI loopback
 numpy>=1.24.0               # 音频数据处理
 faster-whisper>=1.0.0       # ASR 语音识别 (CTranslate2 量化)
 

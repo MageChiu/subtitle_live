@@ -72,6 +72,11 @@ class SubtitlePipeline:
             device=cfg.asr.device,
             compute_type=cfg.asr.compute_type,
         )
+        if hasattr(self._asr, "set_runtime_options"):
+            self._asr.set_runtime_options(
+                beam_size=cfg.asr.beam_size,
+                vad_filter=cfg.asr.vad_filter,
+            )
 
         # Translator
         self._translator = PluginRegistry.get_translator(cfg.translator.engine)
@@ -170,10 +175,8 @@ class SubtitlePipeline:
         try:
             self._audio_q.put_nowait(chunk)
         except queue.Full:
-            try:
-                self._audio_q.get_nowait()
-            except queue.Empty:
-                pass
+            # 低延迟优先: 队列满时直接丢弃旧 chunk, 保留最新音频
+            self._drop_stale_items(self._audio_q, keep_latest=2)
             self._audio_q.put_nowait(chunk)
 
     def _asr_worker(self) -> None:
@@ -208,10 +211,7 @@ class SubtitlePipeline:
             try:
                 self._text_q.put_nowait(result)
             except queue.Full:
-                try:
-                    self._text_q.get_nowait()
-                except queue.Empty:
-                    pass
+                self._drop_stale_items(self._text_q, keep_latest=1)
                 self._text_q.put_nowait(result)
 
     def _trans_worker(self) -> None:
@@ -281,6 +281,15 @@ class SubtitlePipeline:
     @staticmethod
     def _drain(q: queue.Queue) -> None:
         while True:
+            try:
+                q.get_nowait()
+            except queue.Empty:
+                break
+
+    @staticmethod
+    def _drop_stale_items(q: queue.Queue, keep_latest: int) -> None:
+        target_size = max(0, int(keep_latest))
+        while q.qsize() > target_size:
             try:
                 q.get_nowait()
             except queue.Empty:
